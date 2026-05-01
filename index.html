@@ -93,7 +93,7 @@
 <body>
 
 <h1>NASA random image Viewer</h1>
-<h4>If the rate limit is met, the image will fail to load.</h4>
+<h4>Please have patience! The images will load, it is just slow (at Nasa's part)</h4>
 <p id="title"></p>
 
 <div id="content"></div>
@@ -113,7 +113,7 @@ const btn = document.getElementById("nextBtn");
 let cache = [];
 
 async function fetchBatch() {
-    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=4";
+    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=5";
 
     const res = await fetch(url);
 
