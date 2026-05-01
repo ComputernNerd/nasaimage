@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random NASA Image</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #0b0f1a;
+            color: white;
+            margin: 0;
+            padding: 10px;
+            padding-bottom: 80px;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+        }
+
+        img {
+            width: 100%;
+            max-width: 900px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin: 10px auto;
+            padding-bottom: 56.25%;
+            height: 0;
+        }
+
+        iframe {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            border: none;
+        }
+
+        #descriptionBox {
+            max-width: 900px;
+            margin: 25px auto;
+            padding: 15px;
+            background: #2a2f3a;
+            border-radius: 12px;
+            text-align: left;
+            line-height: 1.5;
+            font-size: 0.95rem;
+
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s ease;
+        }
+
+        #descriptionBox.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #rateLimit {
+            position: fixed;
+            bottom: 8px;
+            left: 8px;
+            font-size: 11px;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🌌 Random NASA Image</h1>
+<p id="title"></p>
+<div id="content"></div>
+
+<div id="descriptionBox">
+    <div><strong>Description</strong></div>
+    <div id="description"></div>
+</div>
+
+<div id="rateLimit">Loading rate limit...</div>
+
+<script>
+async function loadAPOD() {
+    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=1";
+
+    try {
+        const res = await fetch(url);
+
+        const limit = res.headers.get("x-ratelimit-limit");
+        const remaining = res.headers.get("x-ratelimit-remaining");
+
+        document.getElementById("rateLimit").innerText =
+            (limit && remaining)
+            ? `Rate limit: ${remaining} / ${limit}`
+            : "Rate limit: not available";
+
+        const data = await res.json();
+        const apod = data[0];
+
+        document.getElementById("title").innerText = apod.title;
+        document.getElementById("description").innerText = apod.explanation;
+
+        const container = document.getElementById("content");
+        const descBox = document.getElementById("descriptionBox");
+
+        container.innerHTML = "";
+        descBox.classList.remove("visible");
+
+        if (apod.media_type === "image") {
+            const img = document.createElement("img");
+            img.src = apod.url;
+
+            // 🔥 Wait until image loads
+            img.onload = () => {
+                descBox.classList.add("visible");
+            };
+
+            container.appendChild(img);
+
+        } else {
+            const wrapper = document.createElement("div");
+            wrapper.className = "video-wrapper";
+
+            const iframe = document.createElement("iframe");
+            iframe.src = apod.url;
+
+            // Videos don’t reliably fire "load" → delay a bit
+            setTimeout(() => {
+                descBox.classList.add("visible");
+            }, 800);
+
+            wrapper.appendChild(iframe);
+            container.appendChild(wrapper);
+        }
+
+    } catch (err) {
+        document.getElementById("content").innerText = "Failed to load image.";
+        document.getElementById("rateLimit").innerText = "Rate limit: error";
+        console.error(err);
+    }
+}
+
+loadAPOD();
+</script>
+
+</body>
+</html>
