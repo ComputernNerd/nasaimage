@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random NASA Image</title>
+    <title>NASA Viewer</title>
 
     <style>
         body {
@@ -16,22 +16,33 @@
             padding-bottom: 80px;
         }
 
-        h1 {
-            font-size: 1.6rem;
-        }
+        h1 { font-size: 1.6rem; }
+        #title { margin: 10px 0; opacity: 0.85; }
 
-        img {
+        .media-container {
             width: 100%;
             max-width: 900px;
+            margin: 10px auto;
             border-radius: 10px;
-            margin-top: 10px;
+            overflow: hidden;
+            background: #111;
+        }
+
+        .media-container img {
+            width: 100%;
+            max-height: 70vh;
+            filter: blur(20px);
+            transform: scale(1.05);
+            transition: 0.5s;
+        }
+
+        .media-container img.loaded {
+            filter: blur(0);
+            transform: scale(1);
         }
 
         .video-wrapper {
             position: relative;
-            width: 100%;
-            max-width: 900px;
-            margin: 10px auto;
             padding-bottom: 56.25%;
             height: 0;
         }
@@ -40,7 +51,6 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            border-radius: 10px;
             border: none;
         }
 
@@ -51,17 +61,24 @@
             background: #2a2f3a;
             border-radius: 12px;
             text-align: left;
-            line-height: 1.5;
-            font-size: 0.95rem;
 
             opacity: 0;
             transform: translateY(10px);
-            transition: all 0.4s ease;
+            transition: 0.4s;
         }
 
         #descriptionBox.visible {
             opacity: 1;
             transform: translateY(0);
+        }
+
+        #nextBtn {
+            margin-top: 15px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: none;
+            background: #4c8bf5;
+            color: white;
         }
 
         #rateLimit {
@@ -75,79 +92,123 @@
 </head>
 <body>
 
-<h1>🌌 Random NASA Image</h1>
+<h1>NASA random image Viewer</h1>
+<h4>If the rate limit is met, the image will fail to load.</h4>
 <p id="title"></p>
+
 <div id="content"></div>
 
+<button id="nextBtn">Next</button>
+
 <div id="descriptionBox">
-    <div><strong>Description</strong></div>
+    <strong>Description</strong>
     <div id="description"></div>
 </div>
 
-<div id="rateLimit">Loading rate limit...</div>
+<div id="rateLimit"></div>
 
 <script>
-async function loadAPOD() {
-    const url = "https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&count=1";
+const btn = document.getElementById("nextBtn");
 
-    try {
-        const res = await fetch(url);
+let cache = [];
 
-        const limit = res.headers.get("x-ratelimit-limit");
-        const remaining = res.headers.get("x-ratelimit-remaining");
+async function fetchBatch() {
+    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=4";
 
-        document.getElementById("rateLimit").innerText =
-            (limit && remaining)
-            ? `Rate limit: ${remaining} / ${limit}`
-            : "Rate limit: not available";
+    const res = await fetch(url);
 
-        const data = await res.json();
-        const apod = data[0];
+    // rate limit
+    const limit = res.headers.get("x-ratelimit-limit");
+    const remaining = res.headers.get("x-ratelimit-remaining");
 
-        document.getElementById("title").innerText = apod.title;
-        document.getElementById("description").innerText = apod.explanation;
+    document.getElementById("rateLimit").innerText =
+        limit ? `${remaining}/${limit}` : "";
 
-        const container = document.getElementById("content");
-        const descBox = document.getElementById("descriptionBox");
+    const data = await res.json();
 
-        container.innerHTML = "";
-        descBox.classList.remove("visible");
-
-        if (apod.media_type === "image") {
-            const img = document.createElement("img");
-            img.src = apod.url;
-
-            // 🔥 Wait until image loads
-            img.onload = () => {
-                descBox.classList.add("visible");
-            };
-
-            container.appendChild(img);
-
-        } else {
-            const wrapper = document.createElement("div");
-            wrapper.className = "video-wrapper";
-
-            const iframe = document.createElement("iframe");
-            iframe.src = apod.url;
-
-            // Videos don’t reliably fire "load" → delay a bit
-            setTimeout(() => {
-                descBox.classList.add("visible");
-            }, 800);
-
-            wrapper.appendChild(iframe);
-            container.appendChild(wrapper);
+    // preload images
+    data.forEach(item => {
+        if (item.media_type === "image") {
+            const img = new Image();
+            img.src = item.hdurl || item.url;
         }
+    });
 
-    } catch (err) {
-        document.getElementById("content").innerText = "Failed to load image.";
-        document.getElementById("rateLimit").innerText = "Rate limit: error";
-        console.error(err);
+    cache.push(...data);
+}
+
+async function loadNext() {
+    if (cache.length === 0) {
+        await fetchBatch();
+    }
+
+    // keep buffer filled
+    if (cache.length < 2) {
+        fetchBatch();
+    }
+
+    const apod = cache.shift();
+
+    render(apod);
+}
+
+function render(apod) {
+    const container = document.getElementById("content");
+    const descBox = document.getElementById("descriptionBox");
+
+    container.innerHTML = "Loading...";
+    descBox.classList.remove("visible");
+
+    document.getElementById("title").innerText = apod.title;
+    document.getElementById("description").innerText = apod.explanation;
+
+    if (apod.media_type === "image") {
+        const wrapper = document.createElement("div");
+        wrapper.className = "media-container";
+
+        const img = document.createElement("img");
+        img.src = apod.url;
+
+        const high = new Image();
+        high.src = apod.hdurl || apod.url;
+
+        high.onload = () => {
+            img.src = high.src;
+            img.classList.add("loaded");
+            descBox.classList.add("visible");
+        };
+
+        wrapper.appendChild(img);
+        container.innerHTML = "";
+        container.appendChild(wrapper);
+
+    } else {
+        const wrapper = document.createElement("div");
+        wrapper.className = "media-container";
+
+        const videoWrapper = document.createElement("div");
+        videoWrapper.className = "video-wrapper";
+
+        const iframe = document.createElement("iframe");
+
+        iframe.src = apod.url.includes("youtube")
+            ? `https://www.youtube.com/embed/${apod.url.split("v=")[1]?.split("&")[0]}`
+            : apod.url;
+
+        setTimeout(() => {
+            videoWrapper.appendChild(iframe);
+            wrapper.appendChild(videoWrapper);
+            container.innerHTML = "";
+            container.appendChild(wrapper);
+            descBox.classList.add("visible");
+        }, 500);
     }
 }
 
-loadAPOD();
+btn.onclick = loadNext;
+
+// initial load
+fetchBatch().then(loadNext);
 </script>
 
 </body>
