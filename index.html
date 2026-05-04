@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NASA Viewer</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    <title>Daily Space - powered by NASA</title>
 
     <style>
         body {
@@ -12,8 +13,9 @@
             background: #0b0f1a;
             color: white;
             margin: 0;
-            padding: 10px;
-            padding-bottom: 80px;
+
+            /* 🔥 Mobile padding */
+            padding: 30px 12px 100px;
         }
 
         h1 { font-size: 1.6rem; }
@@ -83,17 +85,23 @@
 
         #rateLimit {
             position: fixed;
-            bottom: 8px;
-            left: 8px;
+            bottom: 10px;
+            left: 10px;
             font-size: 11px;
             opacity: 0.6;
+        }
+
+        /* Desktop spacing tweak */
+        @media (min-width: 768px) {
+            body {
+                padding: 40px 20px 120px;
+            }
         }
     </style>
 </head>
 <body>
 
-<h1>NASA random image Viewer</h1>
-<h4>Please have patience! The images will load, it is just slow (at Nasa's part)</h4>
+<h1>Daily Space - powered by NASA</h1>
 <p id="title"></p>
 
 <div id="content"></div>
@@ -109,15 +117,18 @@
 
 <script>
 const btn = document.getElementById("nextBtn");
-
 let cache = [];
 
+// 🔥 filter function
+function isUsable(item) {
+    return !item.copyright; // skip copyrighted
+}
+
 async function fetchBatch() {
-    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=5";
+    const url = "https://api.nasa.gov/planetary/apod?api_key=5jXpLU3I50QVYG9JZWD6M7BDIBA2lFShp0hRCBBD&count=4";
 
     const res = await fetch(url);
 
-    // rate limit
     const limit = res.headers.get("x-ratelimit-limit");
     const remaining = res.headers.get("x-ratelimit-remaining");
 
@@ -126,15 +137,22 @@ async function fetchBatch() {
 
     const data = await res.json();
 
+    const filtered = data.filter(isUsable);
+
     // preload images
-    data.forEach(item => {
+    filtered.forEach(item => {
         if (item.media_type === "image") {
             const img = new Image();
             img.src = item.hdurl || item.url;
         }
     });
 
-    cache.push(...data);
+    cache.push(...filtered);
+
+    // if everything got filtered out → try again
+    if (cache.length === 0) {
+        return fetchBatch();
+    }
 }
 
 async function loadNext() {
@@ -142,13 +160,11 @@ async function loadNext() {
         await fetchBatch();
     }
 
-    // keep buffer filled
     if (cache.length < 2) {
         fetchBatch();
     }
 
     const apod = cache.shift();
-
     render(apod);
 }
 
